@@ -91,9 +91,7 @@ const QUESTIONS = {
 
 // --- AI Helper Functions ---
 
-const normalizeScore = (score: number): number => {
-    if (score > 0 && score <= 10) { return score * 10; } return score;
-};
+const clampScore = (score: number): number => Math.round(Math.min(100, Math.max(0, score)));
 
 const analyzeWithGemini = async (question: string, transcript: string, type: string): Promise<InterviewSession['feedback'] & { overallScore: number }> => {
     if (!transcript || transcript.trim().length < 10) {
@@ -107,7 +105,7 @@ const analyzeWithGemini = async (question: string, transcript: string, type: str
         };
     }
 
-    const systemPrompt = "You are an expert interview coach for students. Evaluate interview answers based on the STAR method. IMPORTANT: All scores must be integers between 0 and 100. Never use a 1-10 scale.";
+    const systemPrompt = "You are an expert interview coach for students. Evaluate interview answers based on the STAR method. CRITICAL RULE: All scores MUST be integers between 0 and 100. A score of 50 means average, 75 means good, 90 means excellent, and 30 means poor. NEVER use a 1-10 scale. A weak answer should score around 30-45, a decent answer 55-70, and a strong answer 75-90.";
     const userQuery = ` Question: "${question}" Candidate's Answer (${type} Interview): "${transcript}" Provide
             your analysis in the following JSON format. Ensure all "score" fields are integers between 0 and 100:
             { "overallScore" : 85, "summary" : "Clear and concise explanation of the situation." , "clarity" : { "score"
@@ -152,13 +150,12 @@ const analyzeWithGemini = async (question: string, transcript: string, type: str
 
             const result = JSON.parse(textResult.replace(/```json\n?/, '').replace(/```\n?$/, '').trim());
 
-            // Normalization check to fix the 1-10 scoring bug
             return {
                 ...result,
-                overallScore: normalizeScore(result.overallScore),
-                clarity: { ...result.clarity, score: normalizeScore(result.clarity.score) },
-                content: { ...result.content, score: normalizeScore(result.content.score) },
-                confidence: { ...result.confidence, score: normalizeScore(result.confidence.score) }
+                overallScore: clampScore(result.overallScore),
+                clarity: { ...result.clarity, score: clampScore(result.clarity.score) },
+                content: { ...result.content, score: clampScore(result.content.score) },
+                confidence: { ...result.confidence, score: clampScore(result.confidence.score) }
             };
         } catch (error) {
             if (retries > 0) {
